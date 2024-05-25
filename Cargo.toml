@@ -2,7 +2,13 @@
 name = "neural-net-rs"
 version = "0.1.0"
 edition = "2021"
+authors = ["Frederik Kirk", "Anton Kirk"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+
+[build]
+rustflags = ["-C", "link-arg=-fuse-ld=lld"]
+
 [dependencies]
+uuid = { version = "1.8.0", features = ["v4"] }
