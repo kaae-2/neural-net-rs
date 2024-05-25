@@ -13,6 +13,7 @@ pub enum Operation {
     Sub,
     Mul,
     Div,
+    Pow,
     #[default]
     None,
 }
@@ -65,6 +66,20 @@ impl Eq for Value {}
 impl Value {
     pub fn new(value: ValueData) -> Value {
         Value(Rc::new(RefCell::new(value)))
+    }
+
+    pub fn pow(&self, power: f64) -> Value {
+        let result = Value::from(self.borrow().data.powf(power));
+        result.borrow_mut()._op = Some(Operation::Pow);
+        result.borrow_mut()._prev = vec![self.clone(), Value::from(power)];
+
+        result.borrow_mut()._backward = Some(|val: &ValueData| {
+            let base = val._prev[0].borrow().data;
+            let p = val._prev[1].borrow().data;
+            val._prev[0].borrow_mut().grad += p * base.powf(p - 1.0) * val.grad;
+        });
+
+        result
     }
 
     pub fn backward(&self) {
@@ -130,6 +145,15 @@ impl ops::Mul<&Value> for &Value {
     }
 }
 
+impl ops::Neg for &Value {
+    type Output = Value;
+    fn neg(self) -> Value {
+        let result = self * &Value::from(-1.0);
+
+        result
+    }
+}
+
 fn main() {
     println!("Hello, world!");
 }
@@ -152,6 +176,19 @@ mod tests {
         let c = &a * &b;
         assert_eq!(c.borrow().data, -8.0);
         assert_ne!(c.borrow().data, 2.0);
+    }
+    #[test]
+    fn sanity_check_neg() {
+        let a = Value::from(1.0);
+        let b = -&a;
+        assert_eq!(b.borrow().data, -1.0);
+    }
+    #[test]
+    fn sanity_check_pow() {
+        let a = Value::from(2.0);
+        let b = 3.0;
+        let c = a.pow(b);
+        assert_eq!(c.borrow().data, 8.0);
     }
     #[test]
     fn sanity_check_backprop_add() {
