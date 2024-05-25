@@ -186,7 +186,7 @@ mod tests {
             .iter()
             .for_each(|x| assert_eq!(x.borrow().grad, 0.0));
         e.backward();
-
+        //
         assert_eq!(a.borrow().grad, 6.0);
         assert_eq!(b.borrow().grad, 3.0);
         assert_eq!(c.borrow().grad, 2.0);
