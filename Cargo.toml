@@ -11,4 +11,5 @@ authors = ["Frederik Kirk", "Anton Kirk"]
 rustflags = ["-C", "link-arg=-fuse-ld=lld"]
 
 [dependencies]
+impl_ops = "0.1.1"
 uuid = { version = "1.8.0", features = ["v4"] }
