@@ -39,8 +39,12 @@ impl Neuron {
 
         output
     }
+    pub fn parameters(&self) -> Vec<Value> {
+        let mut output = self.weights.clone();
+        output.push(self.bias.clone());
+        output
+    }
 }
-// TODO: Fix from impl to take values
 impl From<(Vec<f64>, f64, bool)> for Neuron {
     fn from(vals: (Vec<f64>, f64, bool)) -> Neuron {
         Neuron {
@@ -54,7 +58,21 @@ impl From<(Vec<f64>, f64, bool)> for Neuron {
         }
     }
 }
-struct Layer;
+struct Layer {
+    neurons: Vec<Neuron>,
+}
+
+impl Layer {
+    pub fn new(nin: usize, nout: usize, nonlin: bool) -> Layer {
+        Layer {
+            neurons: (0..nout).map(|_| Neuron::new(nin, nonlin)).collect(),
+        }
+    }
+
+    // pub fn parameters(&self) {}
+
+    // pub fn forward(&self, )
+}
 
 struct MLP;
 
