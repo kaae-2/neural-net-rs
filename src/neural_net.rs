@@ -25,15 +25,8 @@ impl Neuron {
             nonlin,
         }
     }
-    pub fn from(vals: Vec<Value>, nonlin: bool) -> Neuron {
-        Neuron {
-            weights: vals,
-            bias: Value::from(0.0),
-            nonlin,
-        }
-    }
 
-    pub fn forward(&self, activations: Vec<Value>) -> Value {
+    pub fn forward(&self, activations: &Vec<Value>) -> Value {
         let mut result: Value = self
             .weights
             .iter()
@@ -48,11 +41,19 @@ impl Neuron {
     }
 }
 // TODO: Fix from impl to take values
-// impl<T: Into<Vec<Value>>> From<T> for Neuron {
-//     fn from(t: T) -> Neuron {
-//         Neuron::from(t, false)
-//     }
-// }
+impl From<(Vec<f64>, f64, bool)> for Neuron {
+    fn from(vals: (Vec<f64>, f64, bool)) -> Neuron {
+        Neuron {
+            weights: vals
+                .0
+                .iter()
+                .map(|val| Value::from(val.to_owned()))
+                .collect(),
+            bias: Value::from(vals.1),
+            nonlin: vals.2,
+        }
+    }
+}
 struct Layer;
 
 struct MLP;
@@ -71,8 +72,11 @@ mod tests {
     #[test]
     fn sanity_check_neuron_forward() {
         let activations = vec![Value::from(2.0); 2];
-        let neuron = Neuron::from(vec![Value::from(1.0), Value::from(0.0)], false);
-        let check = neuron.forward(activations);
-        println!("{:?}", check)
+        let neuron = Neuron::from((vec![2.0, 1.0], 0.0, false));
+        assert_eq!(neuron.forward(&activations).borrow().data, 6.0);
+        let neuron2 = Neuron::from((vec![1.0, 2.0], 1.0, false));
+        assert_eq!(neuron2.forward(&activations).borrow().data, 7.0);
+        let neuron3 = Neuron::from((vec![-2.0, 1.0], 0.0, true));
+        assert_eq!(neuron3.forward(&activations).borrow().data, 0.0);
     }
 }
