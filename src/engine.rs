@@ -1,22 +1,28 @@
 use std::{
     cell::RefCell,
     collections::HashSet,
+    fmt,
     hash::{Hash, Hasher},
+    iter::Sum,
     ops,
     rc::Rc,
 };
 use uuid::Uuid;
 
 // #[derive(Default)]
+
+#[derive(Debug)]
 pub enum Operation {
     Add,
     Sub,
     Mul,
     Div,
     Pow,
+    Relu,
     // #[default]
     // None,
 }
+#[derive(Debug)]
 pub struct ValueData {
     pub data: f64,
     pub grad: f64,
@@ -26,7 +32,7 @@ pub struct ValueData {
     pub _op: Option<Operation>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Value(Rc<RefCell<ValueData>>);
 
 impl ops::Deref for Value {
@@ -58,6 +64,12 @@ impl Hash for Value {
 impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
         self.borrow().uuid == other.borrow().uuid
+    }
+}
+
+impl fmt::Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "data: {}", self.borrow().data)
     }
 }
 
@@ -104,6 +116,17 @@ impl Value {
                 .for_each(|child| child.build_topo(topo, visited));
             topo.push(self.to_owned())
         }
+    }
+
+    pub fn relu(&self) -> Value {
+        let result = Value::from(self.borrow().data.max(0.0));
+        result.borrow_mut()._op = Some(Operation::Relu);
+        result.borrow_mut()._prev = vec![self.clone()];
+        result.borrow_mut()._backward = Some(|val: &ValueData| {
+            val._prev[0].borrow_mut().grad += if val.data > 0.0 { val.grad } else { 0.0 };
+        });
+
+        result
     }
 }
 
@@ -176,6 +199,16 @@ impl ops::AddAssign<&Value> for Value {
 impl ops::MulAssign<&Value> for Value {
     fn mul_assign(&mut self, _rhs: &Value) {
         *self = &self.clone() * _rhs;
+    }
+}
+
+impl Sum for Value {
+    fn sum<I>(mut iter: I) -> Self
+    where
+        I: Iterator<Item = Self>,
+    {
+        let first = iter.next().expect("must have a value");
+        iter.fold(first, |acc, val| &acc + &val)
     }
 }
 
@@ -258,11 +291,6 @@ mod tests {
         vals.clone()
             .iter()
             .for_each(|f| assert_eq!(f.borrow().grad, 1.0));
-        // assert_eq!(a.borrow().grad, 0.0);
-        // assert_eq!(b.borrow().grad, 0.0);
-        // assert_eq!(c.borrow().grad, 0.0);
-        // assert_eq!(d.borrow().grad, 0.0);
-        // assert_eq!(e.borrow().grad, 0.0);
     }
     #[test]
     fn sanity_check_backprop() {
@@ -282,5 +310,15 @@ mod tests {
         assert_eq!(c.borrow().grad, 2.0);
         assert_eq!(d.borrow().grad, 3.0);
         assert_eq!(e.borrow().grad, 1.0);
+    }
+    #[test]
+    fn sanity_check_relu() {
+        let a = Value::from(1.0);
+        let b = Value::from(-0.3);
+        let c = &b - &a;
+
+        assert_eq!(a.relu().borrow().data, 1.0);
+        assert_eq!(b.relu().borrow().data, 0.0);
+        assert_eq!(c.relu().borrow().data, 0.0);
     }
 }
