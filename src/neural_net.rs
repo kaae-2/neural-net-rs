@@ -47,6 +47,12 @@ impl Neuron {
         output
     }
 }
+// TODO: Fix from impl to take values
+// impl<T: Into<Vec<Value>>> From<T> for Neuron {
+//     fn from(t: T) -> Neuron {
+//         Neuron::from(t, false)
+//     }
+// }
 struct Layer;
 
 struct MLP;
