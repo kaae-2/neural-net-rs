@@ -1,5 +1,4 @@
 use std::{
-    borrow::Borrow,
     error::Error,
     fs::File,
     io::{BufRead, BufReader},
@@ -89,6 +88,32 @@ pub fn loss(model: &MLP, data: &[Vec<f64>], labels: &[f64], alpha: f64) -> (Valu
     (total_loss, accuracy)
 }
 
+pub fn plot_ascii(model: &MLP, bound: isize) {
+    let mut grid: Vec<Vec<String>> = Vec::new();
+    for y in -bound..bound {
+        let mut row: Vec<String> = Vec::new();
+        for x in -bound..bound {
+            let k = &model.forward(vec![
+                Value::from(x as f64 / bound as f64 * 2.0),
+                Value::from(-y as f64 / bound as f64 * 2.0),
+            ])[0];
+            row.push(if k.borrow().data > 0.0 {
+                String::from("+")
+            } else {
+                String::from("0")
+            });
+        }
+        grid.push(row.clone())
+    }
+    for row in grid {
+        // println!("{:?}", row)
+        for val in row {
+            print!("{} ", val)
+        }
+        println!();
+    }
+}
+
 fn main() {
     let model = MLP::new(vec![2, 16, 16, 1]);
     let (data, labels) = load_moon_data();
@@ -97,18 +122,17 @@ fn main() {
         let (total_loss, accuracy) = loss(&model, &data, &labels, alpha);
         model.zero_grad();
         total_loss.backward();
-        let learning_rate = 1.0 - 9.0 * (k as f64) / 100.0;
+        let learning_rate = 1.0 - 0.9 * (k as f64) / 100.0;
         for p in &model.parameters() {
             let delta = learning_rate * p.borrow().grad;
             p.borrow_mut().data -= delta;
         }
-
         println!(
-            "step {k} loss {:.3}, accuracy, {:2}%",
+            "step {k} loss {:.3}, accuracy {:.2}%, learning rate: {:.3}",
             total_loss.borrow().data,
-            accuracy * 100.0
+            accuracy * 100.0,
+            learning_rate
         )
     }
-
-    todo!()
+    plot_ascii(&model, 20);
 }

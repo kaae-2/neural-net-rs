@@ -160,8 +160,10 @@ impl ops::Mul<&Value> for &Value {
         // result.borrow_mut()._prev = vec![self, _rhs];
         result.borrow_mut()._prev = vec![self.clone(), _rhs.clone()];
         result.borrow_mut()._backward = Some(|val: &ValueData| {
-            val._prev[0].borrow_mut().grad += val._prev[1].borrow().data * val.grad;
-            val._prev[1].borrow_mut().grad += val._prev[0].borrow().data * val.grad;
+            let data0 = val._prev[0].borrow().data * val.grad;
+            let data1 = val._prev[1].borrow().data * val.grad;
+            val._prev[0].borrow_mut().grad += data1;
+            val._prev[1].borrow_mut().grad += data0;
         });
 
         result
