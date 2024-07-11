@@ -1,8 +1,6 @@
 use crate::engine::Value;
 use rand::distributions::{Distribution, Uniform};
 
-struct Module;
-
 #[derive(Debug)]
 struct Neuron {
     weights: Vec<Value>,
@@ -64,7 +62,6 @@ impl From<(Vec<f64>, f64, bool)> for Neuron {
 struct Layer {
     neurons: Vec<Neuron>,
     nin: usize,
-    nout: usize,
 }
 
 impl Layer {
@@ -72,7 +69,6 @@ impl Layer {
         Layer {
             neurons: (0..nout).map(|_| Neuron::new(nin, nonlin)).collect(),
             nin,
-            nout,
         }
     }
 
