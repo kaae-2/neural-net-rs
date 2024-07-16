@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 // #[derive(Default)]
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum Operation {
     Add,
     Sub,

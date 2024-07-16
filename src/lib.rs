@@ -3,3 +3,4 @@ extern crate impl_ops;
 
 pub mod engine;
 pub mod neural_net;
+pub mod visualize;
