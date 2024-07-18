@@ -1,9 +1,9 @@
 use std::{collections::HashSet, error::Error};
 
 use graphviz_rust::{
-    attributes::NodeAttributes,
+    attributes::{GraphAttributes, NodeAttributes},
     dot_generator::*,
-    dot_structures::{Edge, EdgeTy, Graph, Id, Node, NodeId, Stmt, Vertex},
+    dot_structures::{Attribute, Edge, EdgeTy, Graph, Id, Node, NodeId, Stmt, Vertex},
     printer::{DotPrinter, PrinterContext},
 };
 use uuid::Uuid;
@@ -52,6 +52,9 @@ fn draw_dots(root: Value) -> Result<String, Box<dyn Error>> {
         strict: true,
         stmts: Vec::new(),
     };
+    graph.add_stmt(Stmt::Attribute(GraphAttributes::rankdir(
+        graphviz_rust::attributes::rankdir::LR,
+    )));
     let (nodes, edges) = trace_nodes(root)?;
     for n in nodes {
         let uid = NodeId(
