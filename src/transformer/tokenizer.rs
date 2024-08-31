@@ -21,8 +21,12 @@ impl Default for BytePairEncoder {
     }
 }
 
+pub enum Encoding {
+    Utf8,
+}
+
 impl BytePairEncoder {
-    pub fn from_utf8(&mut self, input: &str) -> Result<Vec<usize>> {
+    fn from_utf8(&mut self, input: &str) -> Result<Vec<usize>> {
         let byte_rep = input.as_bytes().to_vec();
         let encoded_byte_rep = byte_rep.into_iter().map(u8::into).collect();
 
@@ -32,7 +36,6 @@ impl BytePairEncoder {
             .zip(&encoded_byte_rep)
             .map(|x: (char, &usize)| (x.0.to_string(), x.1.to_owned()))
             .collect::<HashMap<String, usize>>();
-        println!("{:?}", encoded_byte_rep);
         self.vocabulary.extend(vocab);
         Ok(encoded_byte_rep)
     }
@@ -43,7 +46,15 @@ impl BytePairEncoder {
         id
     }
 
-    pub fn encode(&mut self, input: Vec<usize>) -> Result<usize> {
+    pub fn encode(&mut self, input: &str, encoding: Encoding) -> Result<Vec<usize>> {
+        match encoding {
+            Encoding::Utf8 => {
+                let byte_rep = self.from_utf8(input)?;
+                self.encode_loop(byte_rep)
+            } // _ => Err("Not implemented!".into()),
+        }
+    }
+    fn encode_loop(&mut self, input: Vec<usize>) -> Result<Vec<usize>> {
         let mut input_vec = input;
         loop {
             if input_vec.len() <= 1 {
@@ -53,7 +64,7 @@ impl BytePairEncoder {
             }
         }
         if let Some(output) = input_vec.pop() {
-            Ok(output)
+            Ok(vec![output])
         } else {
             unreachable!("we checked in the loop");
         }
@@ -94,10 +105,34 @@ impl BytePairEncoder {
                     }
                     None => output.push(token), // add the not found token to the list
                 }
+            } else {
+                output.push(token)
             }
         }
 
         Ok(output)
+    }
+    pub fn decode(&self, input: Vec<usize>) -> Result<Vec<usize>> {
+        let mut output: Vec<usize> = input.to_owned();
+        for rule in self.get_merge_rules() {
+            let mut temp: Vec<usize> = Vec::new();
+            for token in &output {
+                match token == rule.1 {
+                    true => temp.extend(&[rule.0 .0, rule.0 .1]),
+                    false => temp.push(token.to_owned()),
+                }
+            }
+            output = temp;
+        }
+        return Ok(output);
+    }
+    fn get_merge_rules(&self) -> Vec<(&(usize, usize), &usize)> {
+        let mut merge_rules = self
+            .merges
+            .iter()
+            .collect::<Vec<(&(usize, usize), &usize)>>();
+        merge_rules.sort_by(|a, b| b.1.cmp(a.1));
+        merge_rules
     }
 }
 
@@ -109,9 +144,7 @@ mod tests {
     fn test_bet_string() -> Result<()> {
         let input = "hello world, we are programming!";
         let mut encoder = BytePairEncoder::default();
-
         let output = encoder.from_utf8(input)?;
-
         let expected = vec![
             104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100, 44, 32, 119, 101, 32, 97, 114,
             101, 32, 112, 114, 111, 103, 114, 97, 109, 109, 105, 110, 103, 33,
@@ -127,13 +160,25 @@ mod tests {
         // let input = "hello world, we are programming!";
         let input = "aabbabax";
         let mut encoder = BytePairEncoder::default();
-        let encoded = encoder.from_utf8(input)?;
-        let output = encoder.encode(encoded)?;
-        let expected = 258;
-        println!("{:?}", encoder);
+        let output = encoder.encode(input, Encoding::Utf8)?;
+        let expected = vec![261];
+        println!("encoder: {:?}", encoder);
+        println!("encoded string: {:?}", output);
 
         assert_eq!(output, expected);
 
+        Ok(())
+    }
+    #[test]
+    fn test_bet_decode() -> Result<()> {
+        let input = "abbbcbcd";
+        let mut encoder = BytePairEncoder::default();
+        let encode_once = encoder.from_utf8(input)?;
+        println!("initial encoding: {:?}", encode_once);
+        let encoded = encoder.encode(input, Encoding::Utf8)?;
+        println!("final encoding: {:?}", &encoded);
+        let decoded = encoder.decode(encoded)?;
+        assert_eq!(decoded, encode_once);
         Ok(())
     }
 }

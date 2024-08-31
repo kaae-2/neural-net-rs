@@ -1,15 +1,19 @@
-use neural_net_rs::{transformer::BytePairEncoder, Result};
+use neural_net_rs::{
+    transformer::{BytePairEncoder, Encoding},
+    Result,
+};
 
 fn main() -> Result<()> {
     let input = "aabbabax";
     println!("input string: {input}");
     let mut encoder = BytePairEncoder::default();
-    let encoded = encoder.from_utf8(input)?;
-    println!("0th encoded string {:?}", encoded);
-    let output = encoder.encode(encoded)?;
+    let encoded = encoder.encode(input, Encoding::Utf8)?;
 
     println!("{:?}", encoder);
-    println!("1st encoded string: {:?}", output);
+    println!("last encoded string: {:?}", encoded);
+
+    let decoded = encoder.decode(encoded)?;
+    println!("decoded string: {:?}", decoded);
 
     Ok(())
 }
