@@ -9,20 +9,20 @@ use graphviz_rust::{
 };
 use uuid::Uuid;
 
-use crate::micrograd::{Value, MLP};
+use crate::micrograd::Value;
 
 use crate::Result;
 
 // use crate::{engine::Value, neural_net::MLP};
 
-pub fn visualize_network(network: MLP, filename: String) -> Result<String> {
+pub fn visualize_network(network: Vec<Value>, filename: String) -> Result<String> {
     // for multiple roots
-    let label_nodes = network.last_layer();
+    // let label_nodes = network.last_layer();
     // TODO: add "label nodes" as root and run function
-    println!("{:?}", network);
     let mut total_nodes: HashSet<Value> = HashSet::new();
     let mut total_edges: HashSet<(Value, Value)> = HashSet::new();
-    for node in label_nodes {
+    for node in network {
+        // for node in label_nodes {
         let (n, e) = trace_nodes(node)?;
         total_nodes.extend(n);
         total_edges.extend(e);
@@ -153,7 +153,6 @@ fn make_graph(nodes: HashSet<Value>, edges: HashSet<(Value, Value)>) -> Result<S
 }
 #[cfg(test)]
 mod tests {
-
     use super::*;
 
     #[test]

@@ -14,7 +14,7 @@ pub struct DataPoint {
     label: f64,
 }
 
-pub fn read_csv_file(filename: &str) -> Result<Vec<DataPoint>> {
+fn read_csv_file(filename: &str) -> Result<Vec<DataPoint>> {
     let file = File::open(filename)?;
     let reader = BufReader::new(file);
     let data_points: Vec<DataPoint> = reader
@@ -36,7 +36,7 @@ pub fn read_csv_file(filename: &str) -> Result<Vec<DataPoint>> {
     Ok(data_points)
 }
 
-pub fn load_moon_data() -> (Vec<Vec<f64>>, Vec<f64>) {
+fn load_moon_data() -> (Vec<Vec<f64>>, Vec<f64>) {
     let data_points = read_csv_file("make_moons.csv").expect("moons file should exist");
 
     let (data, labels) = data_points.iter().fold(
@@ -50,7 +50,7 @@ pub fn load_moon_data() -> (Vec<Vec<f64>>, Vec<f64>) {
     (data, labels)
 }
 
-pub fn loss(model: &MLP, data: &[Vec<f64>], labels: &[f64], alpha: f64) -> (Value, f64) {
+fn loss(model: &MLP, data: &[Vec<f64>], labels: &[f64], alpha: f64) -> (Value, f64) {
     let inputs: Vec<Vec<Value>> = data
         .iter()
         .map(|row| vec![Value::from(row[0]), Value::from(row[1])])
@@ -89,7 +89,7 @@ pub fn loss(model: &MLP, data: &[Vec<f64>], labels: &[f64], alpha: f64) -> (Valu
     (total_loss, accuracy)
 }
 
-pub fn plot_ascii(model: &MLP, bound: isize) {
+fn plot_ascii(model: &MLP, bound: isize) {
     let mut grid: Vec<Vec<String>> = Vec::new();
     for y in -bound..bound {
         let mut row: Vec<String> = Vec::new();
@@ -136,6 +136,7 @@ fn main() -> Result<()> {
         )
     }
     plot_ascii(&model, 20);
-    let _ = visualize_network(model, "./moon_graph.png".to_string());
+    let input = vec![Value::from(0.0), Value::from(0.0)];
+    let _ = visualize_network(model.forward(input), "./moon_graph.png".to_string());
     Ok(())
 }
