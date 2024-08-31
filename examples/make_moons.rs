@@ -4,7 +4,7 @@ use std::{
     io::{BufRead, BufReader},
 };
 
-use neural_net_rs::{engine::Value, neural_net::MLP};
+use neural_net_rs::micrograd::{visualize_network, Value, MLP};
 
 pub struct DataPoint {
     x: f64,
@@ -22,7 +22,6 @@ pub fn read_csv_file(filename: &str) -> Result<Vec<DataPoint>, Box<dyn Error>> {
         .map(|(_, line)| {
             let value = line.expect("line cannot be read");
             let fields: Vec<&str> = value.split(',').collect();
-
             let data_point = DataPoint {
                 x: fields[0].parse::<f64>().expect("field 0 can be read"),
                 y: fields[1].parse::<f64>().expect("field 1 can be read"),
@@ -135,4 +134,5 @@ fn main() {
         )
     }
     plot_ascii(&model, 20);
+    let _ = visualize_network(model, "./moon_graph.png".to_string());
 }

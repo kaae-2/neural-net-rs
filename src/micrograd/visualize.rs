@@ -1,20 +1,48 @@
 use std::{collections::HashSet, error::Error};
 
 use graphviz_rust::{
-    attributes::{GraphAttributes, NodeAttributes},
+    attributes::{rankdir::LR, shape::rect, GraphAttributes, NodeAttributes},
+    cmd::{CommandArg, Format},
     dot_generator::*,
-    dot_structures::{Attribute, Edge, EdgeTy, Graph, Id, Node, NodeId, Stmt, Vertex},
+    dot_structures::{Attribute, Edge, EdgeTy, Graph, Id::Html, Node, NodeId, Stmt, Vertex},
+    exec_dot,
     printer::{DotPrinter, PrinterContext},
 };
 use uuid::Uuid;
 
-use crate::{engine::Value, neural_net::MLP};
+use crate::micrograd::{Value, MLP};
 
-pub(crate) fn visualize_network(network: MLP) -> Result<String, Box<dyn Error>> {
-    Ok(String::from("it worked!"))
+use crate::Result;
+
+// use crate::{engine::Value, neural_net::MLP};
+
+pub fn visualize_network(network: MLP, filename: String) -> Result<String> {
+    // for multiple roots
+    let label_nodes = network.last_layer();
+    // TODO: add "label nodes" as root and run function
+    println!("{:?}", network);
+    let mut total_nodes: HashSet<Value> = HashSet::new();
+    let mut total_edges: HashSet<(Value, Value)> = HashSet::new();
+    for node in label_nodes {
+        let (n, e) = trace_nodes(node)?;
+        total_nodes.extend(n);
+        total_edges.extend(e);
+    }
+
+    let dot = make_graph(total_nodes, total_edges)?;
+    let _ = output_graph_file(&dot, filename)?;
+    Ok(dot)
 }
 
-fn trace_nodes(root: Value) -> Result<(HashSet<Value>, HashSet<(Value, Value)>), Box<dyn Error>> {
+fn output_graph_file(dot_graph: &String, filename: String) -> Result<()> {
+    exec_dot(
+        dot_graph.clone(),
+        vec![Format::Png.into(), CommandArg::Output(filename)],
+    )?;
+    Ok(())
+}
+
+fn trace_nodes(root: Value) -> Result<(HashSet<Value>, HashSet<(Value, Value)>)> {
     let (mut nodes, mut edges): (HashSet<Value>, HashSet<(Value, Value)>) =
         (HashSet::new(), HashSet::new());
     fn build<'a>(
@@ -26,7 +54,7 @@ fn trace_nodes(root: Value) -> Result<(HashSet<Value>, HashSet<(Value, Value)>),
             nodes.insert(v.clone());
             for child in &v.borrow()._prev {
                 edges.insert((child.clone(), v.clone()));
-                (nodes, edges) = build(child, nodes, edges).expect("works!");
+                (nodes, edges) = build(child, nodes, edges)?;
             }
         }
         Some((nodes, edges))
@@ -36,7 +64,7 @@ fn trace_nodes(root: Value) -> Result<(HashSet<Value>, HashSet<(Value, Value)>),
     Ok((nodes, edges))
 }
 
-fn uuid_to_id(id: Uuid) -> Result<String, Box<dyn Error>> {
+fn uuid_to_id(id: Uuid) -> Result<String> {
     Ok(id
         .to_string()
         .split(&"-")
@@ -46,21 +74,23 @@ fn uuid_to_id(id: Uuid) -> Result<String, Box<dyn Error>> {
         .to_owned())
 }
 
-fn draw_dots(root: Value) -> Result<String, Box<dyn Error>> {
+fn draw_dots(root: Value) -> Result<String> {
+    // for a single root
+    let (nodes, edges) = trace_nodes(root)?;
+    make_graph(nodes, edges)
+}
+
+fn make_graph(nodes: HashSet<Value>, edges: HashSet<(Value, Value)>) -> Result<String> {
     let mut graph = Graph::DiGraph {
-        id: Id::Html(String::from("1")),
+        id: Html(String::from("1")),
         strict: true,
         stmts: Vec::new(),
     };
-    graph.add_stmt(Stmt::Attribute(GraphAttributes::rankdir(
-        graphviz_rust::attributes::rankdir::LR,
-    )));
-    let (nodes, edges) = trace_nodes(root)?;
+    graph.add_stmt(Stmt::Attribute(GraphAttributes::rankdir(LR)));
+    // merge nodes in list)
+
     for n in nodes {
-        let uid = NodeId(
-            Id::Html(format!("\"{}\"", uuid_to_id(n.borrow().uuid)?)),
-            None,
-        ); // (n.borrow().uuid.to_string());
+        let uid = NodeId(Html(format!("\"{}\"", uuid_to_id(n.borrow().uuid)?)), None);
         graph.add_stmt(Stmt::Node(Node {
             id: uid.clone(),
             attributes: vec![
@@ -70,13 +100,13 @@ fn draw_dots(root: Value) -> Result<String, Box<dyn Error>> {
                     n.borrow().data,
                     n.borrow().grad
                 )),
-                NodeAttributes::shape(graphviz_rust::attributes::shape::rect),
+                NodeAttributes::shape(rect),
             ],
         }));
 
         if n.borrow()._op != None {
             let op_id = NodeId(
-                Id::Html(format!(
+                Html(format!(
                     "\"{}_{:?}\"",
                     uuid_to_id(n.borrow().uuid)?,
                     n.borrow()._op.as_ref().unwrap()
@@ -97,7 +127,7 @@ fn draw_dots(root: Value) -> Result<String, Box<dyn Error>> {
         }
         for (n1, n2) in &edges {
             let n1_id = Vertex::N(NodeId(
-                Id::Html(format!("\"{}\"", uuid_to_id(n1.borrow().uuid)?)),
+                Html(format!("\"{}\"", uuid_to_id(n1.borrow().uuid)?)),
                 None,
             ));
             let n2_string = if n2.borrow()._op.as_ref() != None {
@@ -110,7 +140,7 @@ fn draw_dots(root: Value) -> Result<String, Box<dyn Error>> {
                 format!("\"{}\"", uuid_to_id(n2.borrow().uuid)?)
             };
 
-            let n2_id = Vertex::N(NodeId(Id::Html(n2_string), None));
+            let n2_id = Vertex::N(NodeId(Html(n2_string), None));
 
             graph.add_stmt(Stmt::Edge(Edge {
                 ty: EdgeTy::Pair(n1_id, n2_id),
@@ -124,10 +154,6 @@ fn draw_dots(root: Value) -> Result<String, Box<dyn Error>> {
 }
 #[cfg(test)]
 mod tests {
-    use graphviz_rust::{
-        cmd::{CommandArg, Format},
-        exec_dot,
-    };
 
     use super::*;
 
@@ -140,22 +166,26 @@ mod tests {
         let e = &a * &b;
         let d = &e + &c;
         let f = Value::from(-2.0);
-        let L = &d * &f;
+        let label = &d * &f;
 
         // Call the draw_dots function
-        let dot = draw_dots(L).unwrap();
+        let dot = draw_dots(label).unwrap();
 
         println!("{}", &dot);
 
-        let format = Format::Png;
-
-        let _graph_svg = exec_dot(
-            dot.clone(),
-            vec![format.into(), CommandArg::Output("./test.png".to_string())],
-        )
-        .expect("can generate the dotgraph");
+        let _ = output_graph_file(&dot, "./test.png".to_string());
 
         // Validate the dot output
         assert_eq!(dot, "expected_dot_output");
+    }
+    #[test]
+    fn test_draw_mlp() -> Result<()> {
+        let model = MLP::new(vec![2, 2]);
+
+        let dot = visualize_network(model, "./test-model.png".to_string())?;
+
+        assert_eq!(dot, "expected_dot_output");
+
+        Ok(())
     }
 }

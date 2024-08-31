@@ -1,5 +1,6 @@
-use crate::engine::Value;
 use rand::distributions::{Distribution, Uniform};
+
+use super::Value;
 
 #[derive(Debug)]
 struct Neuron {
@@ -126,6 +127,10 @@ impl MLP {
                 acc.extend(layer.parameters());
                 acc
             })
+    }
+
+    pub fn last_layer(&self) -> Vec<Value> {
+        self.layers.last().expect("layer exists").parameters()
     }
 
     pub fn forward(&self, input: Vec<Value>) -> Vec<Value> {
