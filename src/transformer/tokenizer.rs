@@ -5,7 +5,7 @@ use crate::Result;
 // TODO:build Byte Pair Encoding Tokenizer
 // Optional: encoding rules???
 #[derive(Debug)]
-struct BytePairEncoder {
+pub struct BytePairEncoder {
     vocabulary: HashMap<String, usize>,
     merges: HashMap<(usize, usize), usize>,
     max_token_id: usize,
@@ -37,13 +37,28 @@ impl BytePairEncoder {
         Ok(encoded_byte_rep)
     }
 
-    pub fn get_token_id(&mut self) -> usize {
+    fn get_token_id(&mut self) -> usize {
         self.max_token_id += 1;
         let id = self.max_token_id.clone();
         id
     }
 
-    pub fn encode(&mut self, input: Vec<usize>) -> Result<Vec<usize>> {
+    pub fn encode(&mut self, input: Vec<usize>) -> Result<usize> {
+        let mut input_vec = input;
+        loop {
+            if input_vec.len() <= 1 {
+                break;
+            } else {
+                input_vec = self.encode_once(input_vec)?;
+            }
+        }
+        if let Some(output) = input_vec.pop() {
+            Ok(output)
+        } else {
+            unreachable!("we checked in the loop");
+        }
+    }
+    fn encode_once(&mut self, input: Vec<usize>) -> Result<Vec<usize>> {
         let mut counts: HashMap<(usize, usize), usize> = HashMap::new();
 
         let _ = input
@@ -66,13 +81,23 @@ impl BytePairEncoder {
             .expect("can find a top count");
         let id = self.get_token_id();
         self.merges.insert(top_count.to_owned(), id);
-        //TODO: got to here!
-        todo!();
+        let mut output: Vec<usize> = Vec::new();
+        let mut it = input.into_iter().peekable();
+        while let Some(token) = it.next() {
+            if !it.peek().is_none() {
+                let test = (token, it.peek().expect("value can be found").to_owned());
+                match self.merges.get(&test) {
+                    Some(value) => {
+                        // consume both tokens and replace with merge value
+                        it.next();
+                        output.push(value.to_owned())
+                    }
+                    None => output.push(token), // add the not found token to the list
+                }
+            }
+        }
 
-        println!("counts: {:?}", counts);
-        println!("top count: {:?}", top_count);
-
-        Ok(Vec::new())
+        Ok(output)
     }
 }
 
@@ -104,11 +129,7 @@ mod tests {
         let mut encoder = BytePairEncoder::default();
         let encoded = encoder.from_utf8(input)?;
         let output = encoder.encode(encoded)?;
-
-        let expected = vec![
-            104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100, 44, 32, 119, 101, 32, 97, 114,
-            101, 32, 112, 114, 111, 103, 114, 97, 109, 109, 105, 110, 103, 33,
-        ];
+        let expected = 258;
         println!("{:?}", encoder);
 
         assert_eq!(output, expected);

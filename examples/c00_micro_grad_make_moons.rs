@@ -1,10 +1,12 @@
 use std::{
-    error::Error,
     fs::File,
     io::{BufRead, BufReader},
 };
 
-use neural_net_rs::micrograd::{visualize_network, Value, MLP};
+use neural_net_rs::{
+    micrograd::{visualize_network, Value, MLP},
+    Result,
+};
 
 pub struct DataPoint {
     x: f64,
@@ -12,7 +14,7 @@ pub struct DataPoint {
     label: f64,
 }
 
-pub fn read_csv_file(filename: &str) -> Result<Vec<DataPoint>, Box<dyn Error>> {
+pub fn read_csv_file(filename: &str) -> Result<Vec<DataPoint>> {
     let file = File::open(filename)?;
     let reader = BufReader::new(file);
     let data_points: Vec<DataPoint> = reader
@@ -113,7 +115,7 @@ pub fn plot_ascii(model: &MLP, bound: isize) {
     }
 }
 
-fn main() {
+fn main() -> Result<()> {
     let model = MLP::new(vec![2, 16, 16, 1]);
     let (data, labels) = load_moon_data();
     let alpha = 0.001;
@@ -135,4 +137,5 @@ fn main() {
     }
     plot_ascii(&model, 20);
     let _ = visualize_network(model, "./moon_graph.png".to_string());
+    Ok(())
 }

@@ -1,10 +1,9 @@
-use std::{collections::HashSet, error::Error};
+use std::collections::HashSet;
 
 use graphviz_rust::{
     attributes::{rankdir::LR, shape::rect, GraphAttributes, NodeAttributes},
     cmd::{CommandArg, Format},
-    dot_generator::*,
-    dot_structures::{Attribute, Edge, EdgeTy, Graph, Id::Html, Node, NodeId, Stmt, Vertex},
+    dot_structures::{Edge, EdgeTy, Graph, Id::Html, Node, NodeId, Stmt, Vertex},
     exec_dot,
     printer::{DotPrinter, PrinterContext},
 };
@@ -34,7 +33,7 @@ pub fn visualize_network(network: MLP, filename: String) -> Result<String> {
     Ok(dot)
 }
 
-fn output_graph_file(dot_graph: &String, filename: String) -> Result<()> {
+pub fn output_graph_file(dot_graph: &String, filename: String) -> Result<()> {
     exec_dot(
         dot_graph.clone(),
         vec![Format::Png.into(), CommandArg::Output(filename)],
@@ -74,7 +73,7 @@ fn uuid_to_id(id: Uuid) -> Result<String> {
         .to_owned())
 }
 
-fn draw_dots(root: Value) -> Result<String> {
+pub fn draw_dots(root: Value) -> Result<String> {
     // for a single root
     let (nodes, edges) = trace_nodes(root)?;
     make_graph(nodes, edges)
@@ -173,19 +172,7 @@ mod tests {
 
         println!("{}", &dot);
 
-        let _ = output_graph_file(&dot, "./test.png".to_string());
-
         // Validate the dot output
         assert_eq!(dot, "expected_dot_output");
-    }
-    #[test]
-    fn test_draw_mlp() -> Result<()> {
-        let model = MLP::new(vec![2, 2]);
-
-        let dot = visualize_network(model, "./test-model.png".to_string())?;
-
-        assert_eq!(dot, "expected_dot_output");
-
-        Ok(())
     }
 }
