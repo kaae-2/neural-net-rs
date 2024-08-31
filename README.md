@@ -10,3 +10,5 @@ To test during development with hot reload, run cargo-watch
 `cargo watch test`
 
 `cargo watch -q -c -x "test TEST_NAME -- --nocapture"`
+
+`cargo watch -q -c -x "run -q --example EX_NAME"`
