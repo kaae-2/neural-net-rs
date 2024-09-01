@@ -1,5 +1,5 @@
-use neural_net_rs::micrograd::{draw_dots, output_graph_file, Value};
-use neural_net_rs::Result;
+use neural_net::micrograd::{draw_dots, output_graph_file, Value};
+use neural_net::Result;
 
 fn main() -> Result<()> {
     // Toy example making a graphviz

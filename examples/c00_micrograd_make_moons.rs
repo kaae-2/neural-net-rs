@@ -3,7 +3,7 @@ use std::{
     io::{BufRead, BufReader},
 };
 
-use neural_net_rs::{
+use neural_net::{
     micrograd::{visualize_network, Value, MLP},
     Result,
 };

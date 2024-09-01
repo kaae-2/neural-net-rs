@@ -1,4 +1,4 @@
-use neural_net_rs::{
+use neural_net::{
     transformer::{BytePairEncoder, Encoding},
     Result,
 };
