@@ -6,7 +6,7 @@ use crate::Result;
 // Optional: encoding rules???
 #[derive(Debug)]
 pub struct BytePairEncoder {
-    vocabulary: HashMap<String, usize>,
+    vocabulary: HashMap<usize, String>,
     merges: HashMap<(usize, usize), usize>,
     max_token_id: usize,
 }
@@ -34,8 +34,8 @@ impl BytePairEncoder {
             .chars()
             .into_iter()
             .zip(&encoded_byte_rep)
-            .map(|x: (char, &usize)| (x.0.to_string(), x.1.to_owned()))
-            .collect::<HashMap<String, usize>>();
+            .map(|x: (char, &usize)| (x.1.to_owned(), x.0.to_string()))
+            .collect::<HashMap<usize, String>>();
         self.vocabulary.extend(vocab);
         Ok(encoded_byte_rep)
     }
@@ -126,6 +126,7 @@ impl BytePairEncoder {
         }
         return Ok(output);
     }
+
     fn get_merge_rules(&self) -> Vec<(&(usize, usize), &usize)> {
         let mut merge_rules = self
             .merges
@@ -133,6 +134,15 @@ impl BytePairEncoder {
             .collect::<Vec<(&(usize, usize), &usize)>>();
         merge_rules.sort_by(|a, b| b.1.cmp(a.1));
         merge_rules
+    }
+    pub fn to_utf8(&self, input: Vec<usize>) -> Result<String> {
+        input
+            .into_iter()
+            .map(|ch| match self.vocabulary.get(&ch) {
+                Some(letter) => Ok(letter.to_owned()),
+                None => Err(format!("invalid token in input {ch}").into()),
+            })
+            .collect::<Result<String>>()
     }
 }
 
@@ -179,6 +189,22 @@ mod tests {
         println!("final encoding: {:?}", &encoded);
         let decoded = encoder.decode(encoded)?;
         assert_eq!(decoded, encode_once);
+        Ok(())
+    }
+
+    #[test]
+    fn test_bet_to_utf8() -> Result<()> {
+        let input = vec![
+            104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100, 44, 32, 119, 101, 32, 97, 114,
+            101, 32, 112, 114, 111, 103, 114, 97, 109, 109, 105, 110, 103, 33,
+        ];
+        let mut encoder = BytePairEncoder::default();
+        let expected = "hello world, we are programming!".to_string();
+        let _ = encoder.encode(&expected, Encoding::Utf8); // building vocab
+        let output = encoder.to_utf8(input)?;
+
+        assert_eq!(output, expected);
+
         Ok(())
     }
 }

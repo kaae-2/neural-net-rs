@@ -14,6 +14,8 @@ fn main() -> Result<()> {
 
     let decoded = encoder.decode(encoded)?;
     println!("decoded string: {:?}", decoded);
+    let remade_string = encoder.to_utf8(decoded)?;
+    println!("remade string: {:?}", remade_string);
 
     Ok(())
 }
