@@ -60,16 +60,21 @@ impl BytePairEncoder {
             if input_vec.len() <= 1 {
                 break;
             } else {
-                input_vec = self.encode_once(input_vec)?;
+                let input_vec_once = self.encode_once(&input_vec)?;
+                if input_vec_once == input_vec {
+                    break;
+                } else {
+                    input_vec = input_vec_once;
+                }
             }
         }
-        if let Some(output) = input_vec.pop() {
-            Ok(vec![output])
+        if input_vec.len() > 0 {
+            Ok(input_vec)
         } else {
             unreachable!("we checked in the loop");
         }
     }
-    fn encode_once(&mut self, input: Vec<usize>) -> Result<Vec<usize>> {
+    fn encode_once(&mut self, input: &Vec<usize>) -> Result<Vec<usize>> {
         let mut counts: HashMap<(usize, usize), usize> = HashMap::new();
 
         let _ = input
@@ -85,32 +90,40 @@ impl BytePairEncoder {
             .collect::<Vec<_>>();
         //TODO: validate which pair to mint, if only one pair is minted.
         //TODO: also validate if more than one pair is minted
-        let top_count = counts
+        let encoding_candidate = counts
+            // let (top_count, count) = counts
             .iter()
             .max_by(|a, b| a.1.cmp(&b.1))
-            .map(|(k, _v)| k)
+            .map(|(k, &v)| match v > 1 {
+                true => Some((k, v)),
+                false => None,
+            })
             .expect("can find a top count");
-        let id = self.get_token_id();
-        self.merges.insert(top_count.to_owned(), id);
-        let mut output: Vec<usize> = Vec::new();
-        let mut it = input.into_iter().peekable();
-        while let Some(token) = it.next() {
-            if !it.peek().is_none() {
-                let test = (token, it.peek().expect("value can be found").to_owned());
-                match self.merges.get(&test) {
-                    Some(value) => {
-                        // consume both tokens and replace with merge value
-                        it.next();
-                        output.push(value.to_owned())
+        match encoding_candidate {
+            Some((top_count, _)) => {
+                let id = self.get_token_id();
+                self.merges.insert(top_count.to_owned(), id);
+                let mut output: Vec<usize> = Vec::new();
+                let mut it = input.into_iter().peekable();
+                while let Some(token) = it.next() {
+                    if !it.peek().is_none() {
+                        let test = (token.to_owned(), **it.peek().expect("value can be found"));
+                        match self.merges.get(&test) {
+                            Some(value) => {
+                                // consume both tokens and replace with merge value
+                                it.next();
+                                output.push(value.to_owned())
+                            }
+                            None => output.push(*token), // add the not found token to the list
+                        }
+                    } else {
+                        output.push(*token)
                     }
-                    None => output.push(token), // add the not found token to the list
                 }
-            } else {
-                output.push(token)
+                Ok(output)
             }
+            None => Ok(input.clone()),
         }
-
-        Ok(output)
     }
     pub fn decode(&self, input: Vec<usize>) -> Result<Vec<usize>> {
         let mut output: Vec<usize> = input.to_owned();
@@ -168,10 +181,10 @@ mod tests {
     #[test]
     fn test_bet_encode() -> Result<()> {
         // let input = "hello world, we are programming!";
-        let input = "aabbabax";
+        let input = "ababbcbc";
         let mut encoder = BytePairEncoder::default();
         let output = encoder.encode(input, Encoding::Utf8)?;
-        let expected = vec![261];
+        let expected = vec![257, 257, 256, 256];
         println!("encoder: {:?}", encoder);
         println!("encoded string: {:?}", output);
 
