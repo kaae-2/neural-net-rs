@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, iter::Peekable};
 
 use crate::Result;
 
@@ -46,23 +46,107 @@ impl BytePairEncoder {
         id
     }
 
+    pub fn train(
+        &mut self,
+        text: String,
+        encoding: Encoding,
+        max_vocab_size: Option<usize>,
+    ) -> Result<()> {
+        match encoding {
+            Encoding::Utf8 => {
+                let byte_rep = self.from_utf8(&text)?;
+                self.train_loop(byte_rep, max_vocab_size)?; // _ => Err("Not implemented!".into()),
+            }
+        }
+
+        // finish creating vocabulary
+        let mut total_vocab = self.vocabulary.to_owned();
+        for rule in self.get_merge_rules() {
+            total_vocab.insert(
+                *rule.1,
+                format!(
+                    "{}{}",
+                    total_vocab.get(&rule.0 .0).expect("exists").as_str(),
+                    total_vocab.get(&rule.0 .1).expect("exists").as_str()
+                ),
+            );
+        }
+        self.vocabulary = total_vocab;
+        Ok(())
+    }
+
     pub fn encode(&mut self, input: &str, encoding: Encoding) -> Result<Vec<usize>> {
         match encoding {
             Encoding::Utf8 => {
                 let byte_rep = self.from_utf8(input)?;
-                self.encode_loop(byte_rep)
+                self.encode_input(&byte_rep) // TODO: Separate training and encoding
             } // _ => Err("Not implemented!".into()),
         }
     }
-    fn encode_loop(&mut self, input: Vec<usize>) -> Result<Vec<usize>> {
+
+    fn encode_input(&self, input: &Vec<usize>) -> Result<Vec<usize>> {
+        let mut output: Vec<usize> = Vec::new();
+
+        let mut it = input.into_iter().peekable();
+        while let Some(token) = it.next() {
+            if !it.peek().is_none() {
+                let mut result = self.check_merge_rules_recursively(*token, &mut it)?;
+                output.append(&mut result);
+            } else {
+                output.push(*token)
+            }
+        }
+
+        Ok(output)
+    }
+
+    fn check_merge_rules_recursively<'a, I: Iterator<Item = &'a usize>>(
+        &self,
+        token: usize,
+        it: &mut Peekable<I>,
+    ) -> Result<Vec<usize>> {
+        let mut output: Vec<usize> = Vec::new();
+        if !it.peek().is_none() {
+            let test = (token, **it.peek().expect("value can be found"));
+            match self.merges.get(&test) {
+                Some(value) => {
+                    // Consume tokens if found
+                    it.next();
+                    let mut deeper = self.check_merge_rules_recursively(*value, it)?;
+                    output.append(&mut deeper);
+                    Ok(output)
+                }
+                None => {
+                    output.push(token);
+
+                    Ok(output)
+                }
+            }
+        } else {
+            output.push(token);
+            Ok(output)
+        }
+    }
+
+    fn train_loop(
+        &mut self,
+        input: Vec<usize>,
+        max_vocab_size: Option<usize>,
+    ) -> Result<Vec<usize>> {
+        // TODO: this is not just encode, but encode+train, refactor so that train and encode separate steps
         let mut input_vec = input;
+        let loop_iter = match max_vocab_size {
+            Some(v) => v,
+            None => 20 + self.vocabulary.len(), // default max vocab size
+        };
         loop {
-            if input_vec.len() <= 1 {
+            if input_vec.len() <= 1 || self.vocabulary.len() + self.merges.len() >= loop_iter {
+                // TODO: control loop exit condition with parameter instead, e.g. vocab size
                 break;
             } else {
-                let input_vec_once = self.encode_once(&input_vec)?;
+                let input_vec_once = self.train_once(&input_vec)?;
                 if input_vec_once == input_vec {
-                    break;
+                    break; // no more merges were done
                 } else {
                     input_vec = input_vec_once;
                 }
@@ -74,7 +158,7 @@ impl BytePairEncoder {
             unreachable!("we checked in the loop");
         }
     }
-    fn encode_once(&mut self, input: &Vec<usize>) -> Result<Vec<usize>> {
+    fn train_once(&mut self, input: &Vec<usize>) -> Result<Vec<usize>> {
         let mut counts: HashMap<(usize, usize), usize> = HashMap::new();
 
         let _ = input
@@ -125,17 +209,13 @@ impl BytePairEncoder {
             None => Ok(input.clone()),
         }
     }
-    pub fn decode(&self, input: Vec<usize>) -> Result<Vec<usize>> {
-        let mut output: Vec<usize> = input.to_owned();
-        for rule in self.get_merge_rules() {
-            let mut temp: Vec<usize> = Vec::new();
-            for token in &output {
-                match token == rule.1 {
-                    true => temp.extend(&[rule.0 .0, rule.0 .1]),
-                    false => temp.push(token.to_owned()),
-                }
+    pub fn decode(&self, input: Vec<usize>) -> Result<String> {
+        let mut output: String = String::new();
+        for token in input {
+            match self.vocabulary.get(&token) {
+                Some(v) => output.push_str(v),
+                None => unreachable!("the token should exist in vocab!"),
             }
-            output = temp;
         }
         return Ok(output);
     }
@@ -164,7 +244,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_bet_string() -> Result<()> {
+    fn test_bpe_string() -> Result<()> {
         let input = "hello world, we are programming!";
         let mut encoder = BytePairEncoder::default();
         let output = encoder.from_utf8(input)?;
@@ -179,10 +259,11 @@ mod tests {
     }
 
     #[test]
-    fn test_bet_encode() -> Result<()> {
+    fn test_bpe_encode() -> Result<()> {
         // let input = "hello world, we are programming!";
         let input = "ababbcbc";
         let mut encoder = BytePairEncoder::default();
+        encoder.train(input.to_string(), Encoding::Utf8, None)?;
         let output = encoder.encode(input, Encoding::Utf8)?;
         let expected = vec![257, 257, 256, 256];
         println!("encoder: {:?}", encoder);
@@ -193,30 +274,52 @@ mod tests {
         Ok(())
     }
     #[test]
-    fn test_bet_decode() -> Result<()> {
+    fn test_bpe_decode() -> Result<()> {
         let input = "abbbcbcd";
         let mut encoder = BytePairEncoder::default();
+        encoder.train(input.to_string(), Encoding::Utf8, None)?;
         let encode_once = encoder.from_utf8(input)?;
         println!("initial encoding: {:?}", encode_once);
         let encoded = encoder.encode(input, Encoding::Utf8)?;
         println!("final encoding: {:?}", &encoded);
         let decoded = encoder.decode(encoded)?;
-        assert_eq!(decoded, encode_once);
+        assert_eq!(decoded, input);
         Ok(())
     }
 
     #[test]
-    fn test_bet_to_utf8() -> Result<()> {
+    fn test_bpe_to_utf8() -> Result<()> {
         let input = vec![
             104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100, 44, 32, 119, 101, 32, 97, 114,
             101, 32, 112, 114, 111, 103, 114, 97, 109, 109, 105, 110, 103, 33,
         ];
         let mut encoder = BytePairEncoder::default();
         let expected = "hello world, we are programming!".to_string();
+        encoder.train(expected.to_string(), Encoding::Utf8, None)?;
+
         let _ = encoder.encode(&expected, Encoding::Utf8); // building vocab
         let output = encoder.to_utf8(input)?;
 
         assert_eq!(output, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_transformer_flow() -> Result<()> {
+        let input = "aabbabax";
+        println!("input string: {input}");
+        let mut encoder = BytePairEncoder::default();
+        encoder.train(input.to_string(), Encoding::Utf8, None)?;
+
+        let encoded = encoder.encode(input, Encoding::Utf8)?;
+
+        println!("{:?}", encoder);
+        println!("last encoded string: {:?}", encoded);
+
+        let decoded = encoder.decode(encoded)?;
+        println!("decoded string: {:?}", decoded);
+        assert_eq!(input, decoded);
 
         Ok(())
     }
