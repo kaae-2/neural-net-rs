@@ -66,8 +66,20 @@ impl BytePairEncoder {
                 *rule.1,
                 format!(
                     "{}{}",
-                    total_vocab.get(&rule.0 .0).expect("exists").as_str(),
-                    total_vocab.get(&rule.0 .1).expect("exists").as_str()
+                    total_vocab
+                        .get(&rule.0 .0)
+                        .expect(&format!(
+                            "{:?} exists, current vocab: {:?}",
+                            &rule, total_vocab
+                        ))
+                        .as_str(),
+                    total_vocab
+                        .get(&rule.0 .1)
+                        .expect(&format!(
+                            "{:?} exists, current vocab:  {:?}",
+                            &rule, total_vocab
+                        ))
+                        .as_str()
                 ),
             );
         }
@@ -225,7 +237,7 @@ impl BytePairEncoder {
             .merges
             .iter()
             .collect::<Vec<(&(usize, usize), &usize)>>();
-        merge_rules.sort_by(|a, b| b.1.cmp(a.1));
+        merge_rules.sort_by(|a, b| a.1.cmp(b.1));
         merge_rules
     }
     pub fn to_utf8(&self, input: Vec<usize>) -> Result<String> {
