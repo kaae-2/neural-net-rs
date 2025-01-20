@@ -26,6 +26,7 @@ fn main() -> Result<()> {
     // println!("last encoded string: {:?}", encoded);
 
     let decoded = encoder.decode(encoded)?;
+    assert_eq!(input, decoded);
     // println!("decoded string: {:?}", decoded);
 
     Ok(())
